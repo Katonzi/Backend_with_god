@@ -1,0 +1,21 @@
+#Adresse url du dépôt
+https://github.com/katonzi/API_ECOLE
+#Modules npm
+node_modules/
+
+#Les variables d'environnement
+.env 
+
+#Le fichier texte et les fchiers de bases de données
+with.sql
+with.txt
+segond_1910.sql 
+data.sql
+text.txt
+martin.sql
+
+   
+
+
+
+
