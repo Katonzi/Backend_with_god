@@ -20,14 +20,14 @@ app.get("/api/with-god", (req, res)=>{
     res.status(200).json({
         status:"OK",
         message : "Serveur with god est fonctionnel"
-    });
+    }); 
 });
 ///////////////////////////////////////////////////////////////////////////////
 //LES DIFFERENTES ROUTES DE REQUETES DANS LE SERVEUR DE WITH GOD            //
 /////////////////////////////////////////////////////////////////////////////
 
 //AUTHENTIFICATION
-const authRoutes = require("./routes/authRoute");
+const authRoutes = require("./routes/authRoute"); 
 app.use("/api/with-god/auth", authRoutes);   
 //VERSETS
 const verseRoutes = require("./routes/verseRoutes");  
