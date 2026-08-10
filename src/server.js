@@ -10,8 +10,8 @@ const ChatController = require('./controllers/chatController');
 // 2. Initialise Socket.io sur ce serveur avec la configuration CORS   
 const io = new Server(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"] 
+    origin: process.env.SERVER_HOST,
+    methods: ["GET", "POST"]  
   }   
 });
 

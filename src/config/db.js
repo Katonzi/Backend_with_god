@@ -10,18 +10,20 @@ const pool = mysql.createPool({
     port: process.env.DB_PORT || process.env.LOCAL_DB_PORT,
     waitForConnections: true,
     connectionLimit: 10, 
-    queueLimit: 0        
-});         
-  
+    queueLimit: 0           
+});          
+   
 async function logConnection(){
     try{
-         
+         const messageConnect = `Connexion au serveur Mysql ${process.env.DB_USER} réussie ✅`
         const connection = await pool.getConnection();
         if(process.env.DB_HOST){
-            console.log(`Connexion au serveur Mysql ${process.env.DB_USER} réussie ✅`);
+            console.log(messageConnect.toUpperCase());
+            return;
         }
         else if(process.env.LOCAL_DB_HOST){
             console.log(`Connexion mysql local ${process.env.LOCAL_DB_USER} réussie ✅!`);
+            return;
         }
 
         connection.release();  
