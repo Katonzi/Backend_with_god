@@ -14,7 +14,7 @@ const register = async (username, email, password) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const userId = await User.create(username, email, hashedPassword);
+    const userId = await User.create(username.trim(), email, hashedPassword);
     return { userId};    
 };
 

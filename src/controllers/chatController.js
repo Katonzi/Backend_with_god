@@ -2,64 +2,125 @@ const ChatModel = require('../models/chatModel');
 const { encryptMessage, decryptMessage } = require('../utils/encryptionHelper');
 
 const ChatController = {
-    // 🆕 NOUVEAU : Initialiser ou récupérer une conversation entre deux utilisateurs
+
+    // 🆕 Initialiser ou récupérer une conversation entre deux utilisateurs
     initializeConversation: async (req, res) => {
         try {
-            // L'utilisateur 1 est celui connecté (injecté par ton middleware d'authentification, ex: req.user.id)
-            const userOneId = req.user.id; 
-            // L'utilisateur 2 est celui qu'on a recherché et sur lequel on clique (envoyé dans le corps de la requête)
+            // L'utilisateur connecté
+            const userOneId = req.user.id;
+
+            // Utilisateur avec lequel on souhaite discuter
             const { receiverId } = req.body;
 
             if (!receiverId) {
-                return res.status(400).json({ success: false, message: "L'identifiant du destinataire (receiverId) est requis." });
+                return res.status(400).json({
+                    success: false,
+                    message: "L'identifiant du destinataire (receiverId) est requis."
+                });
             }
 
-            // Appel de la méthode existante du modèle
-            const conversationId = await ChatModel.getOrCreateConversation(userOneId, receiverId);
+            // Récupérer ou créer la conversation
+            const conversationId = await ChatModel.getOrCreateConversation(
+                userOneId,
+                receiverId
+            );
 
             return res.status(200).json({
                 success: true,
                 conversationId: conversationId
             });
+
         } catch (error) {
             console.error("Erreur initializeConversation:", error);
-            return res.status(500).json({ success: false, message: "Erreur serveur lors de la création de la conversation." });
+
+            return res.status(500).json({
+                success: false,
+                message: "Erreur serveur lors de la création de la conversation."
+            });
         }
     },
 
-    // Fonction interne pour sauvegarder un nouveau message envoyé (chiffrement inclus)
+
+    // 💬 Sauvegarder un nouveau message
+    // Le message est chiffré avant d'être enregistré.
     storeNewMessage: async (conversationId, senderId, plainText) => {
         try {
-            // 1. Chiffrer le texte reçu
+
+            // 1. Chiffrer le message
             const { encryptedData, iv } = encryptMessage(plainText);
 
-            // 2. Sauvegarder dans MySQL
-            const messageId = await ChatModel.saveMessage(conversationId, senderId, encryptedData, iv);
-            
+            // 2. Sauvegarder le message chiffré en base
+            const messageId = await ChatModel.saveMessage(
+                conversationId,
+                senderId,
+                encryptedData,
+                iv
+            );
+
+            // 3. Récupérer le message fraîchement créé
+            //    avec les informations de son expéditeur.
+            const message = await ChatModel.getMessageById(messageId);
+
+            if (!message) {
+                return {
+                    success: false,
+                    error: "Le message a été enregistré mais impossible de le récupérer."
+                };
+            }
+
+            // 4. Déchiffrer le message pour pouvoir le transmettre
+            //    au serveur Socket.io.
+            const decryptedMessage = {
+                id: message.id,
+                conversation_id: message.conversation_id,
+                sender_id: message.sender_id,
+                sender_name: message.sender_name,
+                text: decryptMessage(
+                    message.message_text,
+                    message.iv
+                ),
+                is_read: message.is_read,
+                created_at: message.created_at
+            };
+
             return {
                 success: true,
-                messageId
+                messageId: messageId,
+                message: decryptedMessage
             };
+
         } catch (error) {
             console.error("Erreur storeNewMessage:", error);
-            return { success: false, error: error.message };
+
+            return {
+                success: false,
+                error: error.message
+            };
         }
     },
 
-    // Récupérer l'historique complet d'une discussion (déchiffrement inclus)
+
+    // 📜 Récupérer l'historique complet d'une discussion
+    // avec déchiffrement des messages.
     getChatHistory: async (req, res) => {
         try {
-            const { conversationId } = req.params;
-            
-            // 1. Récupérer les lignes chiffrées depuis le modèle
-            const rawMessages = await ChatModel.getMessagesByConversation(conversationId);
 
-            // 2. Parcourir et déchiffrer chaque message pour le renvoyer en clair au client légitime
+            const { conversationId } = req.params;
+
+            // Récupérer les messages chiffrés
+            const rawMessages =
+                await ChatModel.getMessagesByConversation(conversationId);
+
+            // Déchiffrer chaque message
             const decryptedMessages = rawMessages.map(msg => ({
                 id: msg.id,
+                conversation_id: msg.conversation_id,
                 sender_id: msg.sender_id,
                 sender_name: msg.sender_name,
-                text: decryptMessage(msg.message_text, msg.iv), // Le texte redevient lisible ici
+                text: decryptMessage(
+                    msg.message_text,
+                    msg.iv
+                ),
                 is_read: msg.is_read,
                 created_at: msg.created_at
             }));
@@ -68,38 +129,68 @@ const ChatController = {
                 success: true,
                 data: decryptedMessages
             });
+
         } catch (error) {
+
             console.error("Erreur getChatHistory:", error);
-            return res.status(500).json({ success: false, message: "Erreur serveur lors de la récupération du chat." });
+
+            return res.status(500).json({
+                success: false,
+                message: "Erreur serveur lors de la récupération du chat."
+            });
         }
     },
 
-    getAllMessages : async(req, res)=>{
-        try{
-                const resultat = await ChatModel.getAllMessages();
 
-                const decryptedMessages = resultat.map(msg => ({
+    // 🌍 Récupérer tous les messages
+    getAllMessages: async (req, res) => {
+        try {
+
+            // Récupérer tous les messages depuis le Model
+            const resultat = await ChatModel.getAllMessages();
+
+            // Déchiffrer les messages
+            const decryptedMessages = resultat.map(msg => ({
                 id: msg.id,
+                conversation_id: msg.conversation_id,
                 sender_id: msg.sender_id,
                 sender_name: msg.sender_name,
-                text: decryptMessage(msg.message_text, msg.iv), // Le texte redevient lisible ici
+                text: decryptMessage(
+                    msg.message_text,
+                    msg.iv
+                ),
                 is_read: msg.is_read,
                 created_at: msg.created_at
             }));
 
             return res.status(200).json({
-                success:true,
-                data : decryptedMessages
-            })
+                success: true,
+                data: decryptedMessages
+            });
 
+        } catch (error) {
+
+            console.error("Erreur getAllMessages:", error);
+
+            return res.status(500).json({
+                success: false,
+                message: error.message
+            });
         }
-        catch(err){
-            res.status(200).json({
-                success:false,
-                message:err.message
-            })
-        }
+    },
+    getConversationUsers: async (conversationId) => {
+    try {
+        return await ChatModel.getConversationUsers(conversationId);
+    } catch (error) {
+        console.error(
+            "Erreur getConversationUsers:",
+            error
+        );
+
+        return [];
     }
+},
+
 };
 
 module.exports = ChatController;

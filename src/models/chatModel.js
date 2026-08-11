@@ -55,11 +55,82 @@ const ChatModel = {
         return rows;
     },
 
-     getAllMessages : async()=>{
-        const [query] = await db.query(`SELECT * FROM messages`);
+     getAllMessages: async () => {
+    const [rows] = await db.query(`
+        SELECT 
+            m.id,
+            m.conversation_id,
+            m.sender_id,
+            m.message_text,
+            m.iv,
+            m.is_read,
+            m.created_at,
+            u.username AS sender_name
+        FROM messages m
+        JOIN users u ON m.sender_id = u.id
+        ORDER BY m.created_at ASC
+    `);
 
-        return query;
+    return rows;
+},
+
+getMessageById: async (messageId) => {
+    const [rows] = await db.query(
+        `SELECT
+            m.id,
+            m.conversation_id,
+            m.sender_id,
+            m.message_text,
+            m.iv,
+            m.is_read,
+            m.created_at,
+            u.username AS sender_name
+         FROM messages m
+         JOIN users u ON m.sender_id = u.id
+         WHERE m.id = ?`,
+        [messageId]
+    );
+
+    return rows[0];
+},
+
+//Récupération supplémentaire des messages
+getAllMessages: async () => {
+    const [rows] = await db.query(
+        `SELECT
+            m.id,
+            m.conversation_id,
+            m.sender_id,
+            m.message_text,
+            m.iv,
+            m.is_read,
+            m.created_at,
+            u.username AS sender_name
+         FROM messages m
+         JOIN users u ON m.sender_id = u.id
+         ORDER BY m.created_at DESC`
+    );
+
+    return rows;
+},
+//Récupération des tous les messages ou les message globaux.
+getConversationUsers: async (conversationId) => {
+    const [rows] = await db.query(
+        `SELECT user_one_id, user_two_id
+         FROM conversations
+         WHERE id = ?`,
+        [conversationId]
+    );
+
+    if (rows.length === 0) {
+        return [];
     }
+
+    return [
+        rows[0].user_one_id,
+        rows[0].user_two_id
+    ];
+},
 };
 
 module.exports = ChatModel;
